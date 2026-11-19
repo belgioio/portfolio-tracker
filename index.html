@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161615" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Portfolio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --line: #e4e2dc; --fg: #1d1d1b; --muted: #6b6a66; --faint: #9a988f;
+  --accent: #2f5fd0; --bench: #c77d12; --ok: #1f7a46; --bad: #b3261e; --warn-bg: #fff4d6; --warn-fg: #6b4e00;
+  --radius: 12px; --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --panel: #1f1f1d; --line: #34332f; --fg: #ecebe6; --muted: #a8a69e; --faint: #7d7b74;
+    --accent: #7ea2ff; --bench: #e9a23b; --ok: #5cc28a; --bad: #ff8a80; --warn-bg: #3a3017; --warn-fg: #f3d58a; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--sans); -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+.pf { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; container-type: inline-size;
+  padding: calc(16px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left)); }
+#main { display: flex; flex-direction: column; gap: 14px; }
+.pf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pf-head h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 1.7rem; }
+.pf-btn { font: inherit; font-size: 0.95rem; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  border-radius: 999px; padding: 8px 16px; min-height: 44px; cursor: pointer; }
+.pf-btn:disabled { opacity: 0.6; cursor: default; }
+.pf-btn.small { min-height: 36px; padding: 6px 14px; font-size: 0.85rem; }
+.pf-status { margin: -6px 0 0; color: var(--muted); font-size: 0.8rem; }
+.pf-banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: var(--radius); padding: 10px 12px; font-size: 0.88rem; }
+.pf-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.pf-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; min-width: 0; }
+.pf-card h3 { margin: 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-big { margin: 4px 0 2px; font-family: var(--serif); font-size: 1.9rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-sub { margin: 0; font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos { color: var(--ok); } .neg { color: var(--bad); }
+.pf-chartcard { display: flex; flex-direction: column; gap: 10px; }
+.pf-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pf h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.pf-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.pf-seg button { font: inherit; font-size: 0.85rem; border: 0; background: transparent; color: var(--muted); padding: 6px 12px; cursor: pointer; }
+.pf-seg button[aria-pressed="true"] { background: var(--bg); color: var(--fg); font-weight: 600; }
+.pf-ctrls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-height: 34px; }
+.pf-chart { position: relative; touch-action: pan-y; }
+.pf-chart svg { display: block; width: 100%; }
+.pf-chart text { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
+.pf-tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 6px 9px; font-size: 0.78rem; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.12); font-variant-numeric: tabular-nums; }
+.pf-tip .k { color: var(--muted); }
+.pf-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+.pf-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pf-sw { width: 16px; border-top: 2px solid; display: inline-block; }
+.pf-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pf-row:last-child { border-bottom: 0; }
+.pf-row .l { min-width: 0; }
+.pf-row .name { font-weight: 500; }
+.pf-row .meta { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+.pf-row .r { text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.pf-row .val { font-family: var(--serif); font-size: 1.15rem; }
+.pf-form { display: flex; gap: 8px; margin-top: 8px; }
+.pf-form input { font: inherit; width: 9em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); }
+.pf-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 2px solid var(--line); margin-top: 4px; }
+.pf-total b { font-family: var(--serif); font-weight: 400; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.pf-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+.pf-table th { text-align: right; font-weight: 500; color: var(--muted); font-size: 0.78rem; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+.pf-table td { text-align: right; padding: 9px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pf-table th:first-child, .pf-table td:first-child { text-align: left; }
+.pf-tag { font-size: 0.68rem; color: var(--faint); border: 1px solid var(--line); border-radius: 6px; padding: 0 4px; margin-left: 4px; }
+.pf-note { margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.5; }
+.pf-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: 92vw; background: var(--fg); color: var(--bg);
+  border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.pf-toast.err { background: var(--bad); color: #fff; }
+#connect .pf-form input { flex: 1; width: auto; min-width: 0; }
+#connect h2 { margin-bottom: 6px; }
+[hidden] { display: none !important; }
+@container (max-width: 560px) {
+  .pf-kpis { gap: 8px; }
+  .pf-kpis .pf-card { padding: 10px 8px; }
+  .pf-big { font-size: clamp(1.05rem, 5.6cqi, 1.6rem); }
+  .pf-card h3 { font-size: 0.76rem; }
+  .pf-sub { font-size: 0.7rem; }
+  .pf-ctrls, .pf-seg.wide { width: 100%; }
+  .pf-seg.wide button { flex: 1 1 0; min-height: 40px; padding: 6px 4px; white-space: nowrap; }
+  .pf-seg.wide { display: flex; }
+  .pf-ctrls select { width: 100%; }
+  .pf-col-detail { display: none; }
+}
+</style>
+</head>
+<body>
+<main class="pf">
+  <header class="pf-head">
+    <h1>Portfolio</h1>
+    <button class="pf-btn" id="sync" type="button">Sync IBKR</button>
+  </header>
+  <p class="pf-status" id="status">Loading…</p>
+  <div class="pf-banner" id="banner" hidden></div>
+
+  <section class="pf-card" id="connect" hidden>
+    <h2>Connect this phone</h2>
+    <p class="pf-note">Open the <b>Phone app link</b> from the Settings tab of your Portfolio tracker sheet on this phone, or paste it here.</p>
+    <div class="pf-form"><input id="connect-input" type="url" inputmode="url" autocomplete="off" placeholder="Paste the link" aria-label="Phone app link"><button class="pf-btn small" id="connect-go" type="button">Connect</button></div>
+  </section>
+
+  <div id="main" hidden>
+  <section class="pf-kpis">
+    <div class="pf-card"><h3>Total return</h3><p class="pf-big" id="t-ret">—</p><p class="pf-sub" id="t-ret-sub">&nbsp;</p></div>
+    <div class="pf-card"><h3>Holdings</h3><p class="pf-big" id="t-hold">—</p><p class="pf-sub">CHF</p></div>
+    <div class="pf-card"><h3>Cash position</h3><p class="pf-big" id="t-cash">—</p><p class="pf-sub">CHF</p></div>
+  </section>
+  <section class="pf-kpis">
+    <div class="pf-card"><h3>Profit</h3><p class="pf-big" id="t-profit">—</p><p class="pf-sub">CHF</p></div>
+    <div class="pf-card"><h3>Cash put in</h3><p class="pf-big" id="t-in">—</p><p class="pf-sub">CHF</p></div>
+    <div class="pf-card"><h3>Account value</h3><p class="pf-big" id="t-value">—</p><p class="pf-sub">CHF</p></div>
+  </section>
+
+  <section class="pf-card pf-chartcard">
+    <div class="pf-bar">
+      <h2 id="chart-title">Return vs benchmark</h2>
+      <div class="pf-seg" id="view" role="group" aria-label="View">
+        <button type="button" data-view="perf" aria-pressed="true">Return</button>
+        <button type="button" data-view="value" aria-pressed="false">Value</button>
+      </div>
+    </div>
+    <div class="pf-ctrls">
+      <div class="pf-seg wide" id="range" role="group" aria-label="Range">
+        <button type="button" data-range="ibkr" aria-pressed="false">Since IBKR</button>
+        <button type="button" data-range="ytd" aria-pressed="false">YTD</button>
+        <button type="button" data-range="1y" aria-pressed="false">1Y</button>
+        <button type="button" data-range="all" aria-pressed="true">All</button>
+      </div>
+      <select id="bench" aria-label="Benchmark"></select>
+    </div>
+    <div class="pf-chart" id="chart"></div>
+    <div class="pf-legend" id="legend"></div>
+  </section>
+
+  <section class="pf-card">
+    <h2>Pension and savings</h2>
+    <div id="wealth"></div>
+    <div class="pf-total"><span>Net worth (CHF)</span><b id="t-net">—</b></div>
+  </section>
+
+  <section class="pf-card">
+    <h2>Holdings</h2>
+    <table class="pf-table">
+      <thead><tr><th>Holding</th><th>CHF</th><th>Weight</th><th>Today</th></tr></thead>
+      <tbody id="holdings"></tbody>
+    </table>
+  </section>
+
+  <p class="pf-note" id="foot"></p>
+  </div>
+</main>
+<div class="pf-toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  var state = { data: null, view: 'perf', range: 'all', bench: 'b1', busy: false, loading: false, fetchedAt: 0 };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- data link (the Apps Script web app, protected by a key) ----------
+  var LINK = 'pt_link';
+  function readLink(text) {
+    var q = new URLSearchParams(String(text || '').split('#')[1] || '');
+    var u = q.get('u'), k = q.get('k');
+    if (u && k && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u) && /^[0-9a-f]{40,}$/.test(k)) return { u: u, k: k };
+    return null;
+  }
+  function link() { try { return JSON.parse(localStorage.getItem(LINK) || 'null'); } catch (e) { return null; } }
+  function keepLink(l) { try { localStorage.setItem(LINK, JSON.stringify(l)); } catch (e) { /* storage unavailable */ } }
+  function forgetLink() { try { localStorage.removeItem(LINK); } catch (e) { /* storage unavailable */ } }
+  if (location.hash) {
+    var fromUrl = readLink(location.href);
+    if (fromUrl) keepLink(fromUrl);
+    history.replaceState(null, '', location.pathname + location.search);   // keep the key out of the address
+  }
+  function api(params) {
+    var l = link();
+    if (!l) return Promise.reject(new Error('This phone is not connected yet.'));
+    var body = { k: l.k };
+    for (var p in params) body[p] = params[p];
+    return fetch(l.u, { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'text/plain;charset=utf-8' } })
+      .catch(function () { throw new Error('No connection. Showing the last numbers loaded.'); })
+      .then(function (r) {
+        if (!r.ok) throw new Error('The sheet answered with HTTP ' + r.status + '.');
+        return r.json();
+      })
+      .then(function (j) {
+        if (j && j.ok) return j;
+        if (j && j.error === 'unauthorized') {
+          forgetLink();
+          showConnect();
+          throw new Error('This phone is no longer connected. Open the Phone app link from the sheet again.');
+        }
+        throw new Error((j && j.error) || 'The sheet sent an unexpected answer.');
+      });
+  }
+  function showConnect() { $('main').hidden = true; $('sync').hidden = true; $('connect').hidden = false; $('status').textContent = 'Not connected'; }
+  function showMain() { $('connect').hidden = true; $('main').hidden = false; $('sync').hidden = false; }
+
+  // ---------- formatting ----------
+  function chf(x) {
+    if (x === null || x === undefined || !isFinite(x)) return '—';
+    return Math.round(x).toLocaleString('de-CH');
+  }
+  function pct(x, d) {
+    if (x === null || x === undefined || !isFinite(x)) return '—';
+    d = d === undefined ? 1 : d;
+    return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x * 100).toFixed(d) + '%';
+  }
+  function signed(x) {
+    if (x === null || x === undefined || !isFinite(x)) return '—';
+    return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(Math.round(x)).toLocaleString('de-CH');
+  }
+  function tone(el, x) {
+    el.classList.remove('pos', 'neg');
+    if (isFinite(x) && x > 0) el.classList.add('pos');
+    if (isFinite(x) && x < 0) el.classList.add('neg');
+  }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function parseDate(s) { var p = s.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function dayMonth(s) { var d = parseDate(s); return d.getDate() + ' ' + MONTHS[d.getMonth()]; }
+  function dayMonthYear(s) { var d = parseDate(s); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+  function stamp(s) {
+    if (!s) return '';
+    var t = s.split('T');
+    return dayMonth(t[0]) + (t[1] ? ' ' + t[1] : '');
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  // ---------- toast ----------
+  var toastTimer = null;
+  function toast(msg, isErr) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'pf-toast' + (isErr ? ' err' : '');
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, isErr ? 7000 : 4000);
+  }
+
+  // ---------- render ----------
+  function render(d) {
+    state.data = d;
+    var t = d.tiles || {};
+    var el;
+    el = $('t-ret'); el.textContent = pct(t.totalReturn); tone(el, t.totalReturn);
+    $('t-ret-sub').textContent = isFinite(t.perYear) && t.perYear !== null ? pct(t.perYear) + ' a year' : '';
+    $('t-hold').textContent = chf(t.holdings);
+    $('t-cash').textContent = chf(t.cash);
+    el = $('t-profit'); el.textContent = signed(t.profit); tone(el, t.profit);
+    $('t-in').textContent = chf(t.cashPutIn);
+    $('t-value').textContent = chf(t.accountValue);
+    $('t-net').textContent = chf(t.netWorth);
+
+    var bits = ['Prices live from Google, up to 20 min late'];
+    if (d.asOf) bits.push('IBKR data to ' + dayMonth(d.asOf));
+    if (d.lastSync) bits.push('synced ' + stamp(d.lastSync));
+    $('status').textContent = bits.join(' · ');
+
+    var banner = [];
+    if (d.lastResult && d.lastResult.indexOf('Failed') === 0) banner.push('Last IBKR sync failed: ' + d.lastResult.replace(/^Failed:\s*/, ''));
+    if (d.tokenExpiry) {
+      var days = Math.round((parseDate(d.tokenExpiry) - new Date()) / 86400000);
+      if (days < 0) banner.push('The IBKR Flex token expired on ' + dayMonthYear(d.tokenExpiry) + '. Create a new one and update FLEX_TOKEN.');
+      else if (days <= 30) banner.push('The IBKR Flex token expires in ' + days + ' day' + (days === 1 ? '' : 's') + ' (' + dayMonthYear(d.tokenExpiry) + ').');
+    }
+    $('banner').hidden = !banner.length;
+    $('banner').textContent = banner.join(' ');
+
+    renderBenchOptions(d);
+    renderWealth(d);
+    renderHoldings(d);
+    renderChart();
+    $('foot').textContent = 'Total return is time-weighted in CHF, chained from IBKR’s daily closing values and today’s live prices. ' +
+      'VIAC values are estimates from stand-in ETFs until you enter the real value. Page built ' + stamp(d.generated) + '.';
+  }
+
+  function renderBenchOptions(d) {
+    var sel = $('bench');
+    var h = d.history || {};
+    var opts = [];
+    if (h.b1Name) opts.push(['b1', h.b1Name + ' in CHF']);
+    if (h.b2Name) opts.push(['b2', h.b2Name + ' in CHF']);
+    opts.push(['none', 'No benchmark']);
+    var html = opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === state.bench ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('');
+    if (sel.innerHTML !== html) sel.innerHTML = html;
+  }
+
+  function renderWealth(d) {
+    var rows = [];
+    (d.viac || []).forEach(function (a) {
+      var meta = a.strategy + (a.anchorDate ? ' · real value ' + chf(a.anchorValue) + ' on ' + dayMonth(a.anchorDate) : '');
+      rows.push(rowHtml('viac', a.account, meta, a.estimate !== null ? chf(a.estimate) : 'Enter value', a.estimate !== null ? 'estimate' : '', a.lastCheck));
+    });
+    (d.other || []).forEach(function (a) {
+      var meta = a.group + (a.balance !== null ? ' · ' + a.currency + ' ' + chf(a.balance) + (a.date ? ' on ' + dayMonth(a.date) : '') : '');
+      rows.push(rowHtml('other', a.account, meta, a.valueChf !== null ? chf(a.valueChf) : 'Enter value', a.inNetWorth ? '' : 'not in net worth', ''));
+    });
+    $('wealth').innerHTML = rows.join('');
+  }
+
+  function rowHtml(kind, name, meta, value, tag, check) {
+    return '<div class="pf-row" data-kind="' + kind + '" data-name="' + esc(name) + '">' +
+      '<div class="l"><div class="name">' + esc(name) + '</div><div class="meta">' + esc(meta) + '</div>' +
+      (check ? '<div class="meta">' + esc(check) + '</div>' : '') +
+      '<div class="pf-form" hidden><input type="text" inputmode="decimal" placeholder="New value" aria-label="New value for ' + esc(name) + '">' +
+      '<button class="pf-btn small" type="button" data-act="save">Save</button></div></div>' +
+      '<div class="r"><div class="val">' + esc(value) + '</div>' + (tag ? '<div class="meta">' + esc(tag) + '</div>' : '') +
+      '<button class="pf-btn small" type="button" data-act="edit">Update</button></div></div>';
+  }
+
+  function renderHoldings(d) {
+    var list = d.holdings || [];
+    var total = list.reduce(function (s, h) { return s + (h.valueChf || 0); }, 0);
+    $('holdings').innerHTML = list.map(function (h) {
+      var w = total > 0 && h.valueChf !== null ? h.valueChf / total : null;
+      var ch = h.change;
+      var cls = isFinite(ch) && ch !== null ? (ch > 0 ? 'pos' : ch < 0 ? 'neg' : '') : '';
+      return '<tr><td>' + esc(h.symbol) + (h.source !== 'Live' ? '<span class="pf-tag">close</span>' : '') + '</td>' +
+        '<td>' + chf(h.valueChf) + '</td><td>' + (w === null ? '—' : (w * 100).toFixed(1) + '%') + '</td>' +
+        '<td class="' + cls + '">' + (h.source === 'Live' ? pct(ch) : '—') + '</td></tr>';
+    }).join('');
+  }
+
+  // ---------- chart ----------
+  function series() {
+    var d = state.data, h = d.history || {};
+    var n = (h.dates || []).length;
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      pts.push({ date: h.dates[i], src: h.source[i], twr: h.twr[i], value: h.value[i], b1: h.b1[i], b2: h.b2[i] });
+    }
+    // live point for today, from the tiles
+    var t = d.tiles || {};
+    var today = (d.generated || '').split('T')[0];
+    if (n && today > h.dates[n - 1] && isFinite(t.totalReturn) && t.totalReturn !== null) {
+      var last = pts[n - 1];
+      var live = function (name, prev) {
+        var m = (d.holdings || []).filter(function (x) { return x.symbol === name && x.source === 'Live' && isFinite(x.change) && x.change !== null; })[0];
+        return m && isFinite(prev) && prev !== null ? prev * (1 + m.change) : null;
+      };
+      pts.push({ date: today, src: 'live', twr: 1 + t.totalReturn, value: t.accountValue, b1: live(h.b1Name, last.b1), b2: live(h.b2Name, last.b2), live: true });
+    }
+    return pts;
+  }
+
+  function startIndex(pts) {
+    if (state.range === 'all' || !pts.length) return 0;
+    var last = parseDate(pts[pts.length - 1].date);
+    var i;
+    if (state.range === 'ibkr') {
+      for (i = pts.length - 1; i >= 0; i--) if (pts[i].src === 'DEGIRO') return i;
+      return 0;
+    }
+    var cut = state.range === 'ytd' ? new Date(last.getFullYear(), 0, 1) : new Date(last.getFullYear() - 1, last.getMonth(), last.getDate());
+    for (i = pts.length - 1; i >= 0; i--) if (parseDate(pts[i].date) <= cut) return i;
+    return 0;
+  }
+
+  function niceTicks(lo, hi, count) {
+    if (lo === hi) { lo -= 1; hi += 1; }
+    var span = hi - lo, step = Math.pow(10, Math.floor(Math.log10(span / count)));
+    var err = span / count / step;
+    if (err >= 7.5) step *= 10; else if (err >= 3.5) step *= 5; else if (err >= 1.5) step *= 2;
+    var ticks = [], v = Math.ceil(lo / step) * step;
+    for (; v <= hi + step * 1e-9; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  function renderChart() {
+    var box = $('chart');
+    var pts = series();
+    if (pts.length < 2) { box.innerHTML = '<p class="pf-note">Not enough history yet.</p>'; $('legend').innerHTML = ''; return; }
+    var s0 = startIndex(pts);
+    var view = pts.slice(s0);
+    var base = view[0];
+    var perf = state.view === 'perf';
+    var bkey = state.bench === 'none' ? null : state.bench;
+    var h = state.data.history;
+    var lines = [];
+    if (perf) {
+      lines.push({ name: 'Portfolio', color: 'var(--accent)', vals: view.map(function (p) { return isFinite(p.twr) && base.twr ? p.twr / base.twr - 1 : null; }) });
+      if (bkey) {
+        lines.push({ name: (bkey === 'b1' ? h.b1Name : h.b2Name) + ' in CHF', color: 'var(--bench)', dash: '5 4',
+          vals: view.map(function (p) { return isFinite(p[bkey]) && p[bkey] !== null && base[bkey] ? p[bkey] / base[bkey] - 1 : null; }) });
+      }
+    } else {
+      lines.push({ name: 'Account value', color: 'var(--accent)', vals: view.map(function (p) { return isFinite(p.value) ? p.value : null; }) });
+    }
+    $('chart-title').textContent = perf ? 'Return vs benchmark' : 'Account value (CHF)';
+    $('bench').hidden = !perf;
+
+    var W = Math.max(280, box.clientWidth || 600), H = W < 520 ? 240 : 300;
+    var m = { l: perf ? 44 : 52, r: 10, t: 10, b: 24 };
+    var all = [];
+    lines.forEach(function (L) { L.vals.forEach(function (v) { if (v !== null) all.push(v); }); });
+    var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    if (perf) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    var pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+    var ticks = niceTicks(lo, hi, 4);
+    lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+    var t0 = parseDate(view[0].date).getTime(), t1 = parseDate(view[view.length - 1].date).getTime();
+    var X = function (s) { return m.l + (W - m.l - m.r) * ((parseDate(s).getTime() - t0) / Math.max(1, t1 - t0)); };
+    var Y = function (v) { return m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo)); };
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" height="' + H + '" role="img" aria-label="' + (perf ? 'Return chart' : 'Value chart') + '">';
+    ticks.forEach(function (v) {
+      var y = Y(v).toFixed(1);
+      svg += '<line x1="' + m.l + '" x2="' + (W - m.r) + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)" stroke-width="1"' + (perf && v === 0 ? '' : ' stroke-dasharray="2 3"') + '/>';
+      svg += '<text x="' + (m.l - 6) + '" y="' + (+y + 4) + '" text-anchor="end">' + (perf ? (v < 0 ? '−' : '') + Math.abs(Math.round(v * 100)) + '%' : (Math.abs(v) >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v))) + '</text>';
+    });
+    var spanDays = (t1 - t0) / 86400000;
+    var nx = W < 520 ? 3 : 6;
+    for (var k = 0; k <= nx; k++) {
+      var tt = t0 + (t1 - t0) * k / nx, dd = new Date(tt);
+      var label = spanDays > 150 ? MONTHS[dd.getMonth()] + ' ' + String(dd.getFullYear()).slice(2) : dd.getDate() + ' ' + MONTHS[dd.getMonth()];
+      var x = m.l + (W - m.l - m.r) * k / nx;
+      svg += '<text x="' + x.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (k === 0 ? 'start' : k === nx ? 'end' : 'middle') + '">' + label + '</text>';
+    }
+    lines.forEach(function (L) {
+      var dpath = '', pen = false;
+      L.vals.forEach(function (v, i) {
+        if (v === null) { pen = false; return; }
+        dpath += (pen ? 'L' : 'M') + X(view[i].date).toFixed(1) + ' ' + Y(v).toFixed(1);
+        pen = true;
+      });
+      svg += '<path d="' + dpath + '" fill="none" stroke="' + L.color + '" stroke-width="2"' + (L.dash ? ' stroke-dasharray="' + L.dash + '"' : '') + ' stroke-linejoin="round"/>';
+    });
+    svg += '<line id="cx" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--faint)" stroke-width="1" visibility="hidden"/>';
+    lines.forEach(function (L, i) { svg += '<circle id="cd' + i + '" r="3.5" fill="' + L.color + '" visibility="hidden"/>'; });
+    svg += '</svg><div class="pf-tip" id="tip" hidden></div>';
+    box.innerHTML = svg;
+
+    $('legend').innerHTML = lines.map(function (L) {
+      var last = null;
+      for (var i = L.vals.length - 1; i >= 0; i--) if (L.vals[i] !== null) { last = L.vals[i]; break; }
+      return '<span><i class="pf-sw" style="border-color:' + L.color + (L.dash ? ';border-top-style:dashed' : '') + '"></i>' + esc(L.name) + ' ' + (perf ? pct(last) : chf(last)) + '</span>';
+    }).join('');
+
+    var svgEl = box.querySelector('svg');
+    function show(clientX) {
+      var r = svgEl.getBoundingClientRect();
+      var px = (clientX - r.left) * (W / r.width);
+      var best = 0, bd = Infinity;
+      view.forEach(function (p, i) { var dx = Math.abs(X(p.date) - px); if (dx < bd) { bd = dx; best = i; } });
+      var x = X(view[best].date);
+      var cx = $('cx'); cx.setAttribute('x1', x); cx.setAttribute('x2', x); cx.setAttribute('visibility', 'visible');
+      var html = '<div class="k">' + dayMonthYear(view[best].date) + (view[best].live ? ' (live)' : '') + '</div>';
+      lines.forEach(function (L, i) {
+        var v = L.vals[best], c = $('cd' + i);
+        if (v === null) { c.setAttribute('visibility', 'hidden'); return; }
+        c.setAttribute('cx', x); c.setAttribute('cy', Y(v)); c.setAttribute('visibility', 'visible');
+        html += '<div>' + esc(L.name) + ': <b>' + (perf ? pct(v) : chf(v)) + '</b></div>';
+      });
+      var tip = $('tip'); tip.innerHTML = html; tip.hidden = false;
+      var left = x * (r.width / W) + 10;
+      if (left + tip.offsetWidth > r.width) left = x * (r.width / W) - tip.offsetWidth - 10;
+      tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '6px';
+    }
+    function hide() {
+      $('cx').setAttribute('visibility', 'hidden'); $('tip').hidden = true;
+      lines.forEach(function (L, i) { $('cd' + i).setAttribute('visibility', 'hidden'); });
+    }
+    svgEl.addEventListener('pointermove', function (e) { show(e.clientX); });
+    svgEl.addEventListener('pointerdown', function (e) { show(e.clientX); });
+    svgEl.addEventListener('pointerleave', hide);
+  }
+
+  // ---------- events ----------
+  function pressGroup(groupId, attr, value) {
+    Array.prototype.forEach.call($(groupId).querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value));
+    });
+  }
+  $('view').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.view = b.getAttribute('data-view'); pressGroup('view', 'data-view', state.view); if (state.data) renderChart();
+  });
+  $('range').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    state.range = b.getAttribute('data-range'); pressGroup('range', 'data-range', state.range); if (state.data) renderChart();
+  });
+  $('bench').addEventListener('change', function () { state.bench = this.value; if (state.data) renderChart(); });
+  window.addEventListener('resize', function () { if (state.data) renderChart(); });
+
+  $('wealth').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var row = b.closest('.pf-row'), form = row.querySelector('.pf-form');
+    if (b.getAttribute('data-act') === 'edit') {
+      form.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector('input').focus();
+      return;
+    }
+    var input = form.querySelector('input');
+    var v = Number(String(input.value).replace(/['’\s]/g, '').replace(',', '.'));
+    if (!(v > 0)) { toast('Enter a positive number.', true); return; }
+    b.disabled = true;
+    api({ a: 'balance', kind: row.getAttribute('data-kind'), name: row.getAttribute('data-name'), value: v })
+      .then(function (j) { save(j.data); render(j.data); toast('Saved.'); })
+      .catch(function (err) { toast(err.message, true); })
+      .then(function () { b.disabled = false; });
+  });
+
+  $('sync').addEventListener('click', function () {
+    if (state.busy || !link()) return;
+    state.busy = true;
+    var btn = $('sync'); btn.disabled = true; btn.textContent = 'Syncing…';
+    api({ a: 'sync' })
+      .then(function (r) { state.fetchedAt = Date.now(); save(r.data); render(r.data); toast(r.message); })
+      .catch(function (err) { toast(err.message, true); })
+      .then(function () { state.busy = false; btn.disabled = false; btn.textContent = 'Sync IBKR'; });
+  });
+
+  // ---------- load ----------
+  function save(d) { try { localStorage.setItem('pt_data', JSON.stringify(d)); } catch (e) { /* storage unavailable */ } }
+  function cached() { try { return JSON.parse(localStorage.getItem('pt_data') || 'null'); } catch (e) { return null; } }
+
+  function load() {
+    if (!link()) { showConnect(); return; }
+    showMain();
+    if (state.loading) return;
+    state.loading = true;
+    api({ a: 'data' })
+      .then(function (j) { state.fetchedAt = Date.now(); save(j.data); render(j.data); })
+      .catch(function (err) {
+        toast(err.message, true);
+        if (!state.data && link()) $('status').textContent = 'Could not load the data.';
+      })
+      .then(function () { state.loading = false; });
+  }
+
+  $('connect-go').addEventListener('click', function () {
+    var l = readLink($('connect-input').value.trim());
+    if (!l) { toast('That is not a Phone app link from the sheet.', true); return; }
+    keepLink(l);
+    $('connect-input').value = '';
+    load();
+  });
+
+  // fresh prices when the app comes back to the front
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && link() && Date.now() - state.fetchedAt > 120000) load();
+  });
+
+  var c = link() ? cached() : null;
+  if (c) { showMain(); render(c); $('status').textContent = 'Updating prices…'; }
+  load();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* works without it */ }); });
+  }
+})();
+</script>
+</body>
+</html>
