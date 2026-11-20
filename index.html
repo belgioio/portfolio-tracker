@@ -49,7 +49,7 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: va
 .pf-seg button[aria-pressed="true"] { background: var(--bg); color: var(--fg); font-weight: 600; }
 .pf-ctrls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px; min-height: 34px; }
-.pf-chart { position: relative; touch-action: pan-y; }
+.pf-chart { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .pf-chart svg { display: block; width: 100%; }
 .pf-chart text { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
 .pf-tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
@@ -74,6 +74,11 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
 .pf-table td { text-align: right; padding: 9px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .pf-table th:first-child, .pf-table td:first-child { text-align: left; }
 .pf-tag { font-size: 0.68rem; color: var(--faint); border: 1px solid var(--line); border-radius: 6px; padding: 0 4px; margin-left: 4px; }
+.pf-custom { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; color: var(--muted); }
+.pf-custom label { display: inline-flex; align-items: center; gap: 6px; }
+.pf-custom input { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; min-height: 34px; }
+.pf-hint { margin: -4px 0 0; color: var(--faint); font-size: 0.74rem; }
+.pf-table tfoot td { font-weight: 600; border-bottom: 0; border-top: 2px solid var(--line); }
 .pf-note { margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.5; }
 .pf-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: 92vw; background: var(--fg); color: var(--bg);
   border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
@@ -92,6 +97,9 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   .pf-seg.wide { display: flex; }
   .pf-ctrls select { width: 100%; }
   .pf-col-detail { display: none; }
+  .pf-table { font-size: 0.82rem; }
+  .pf-table th, .pf-table td { padding-left: 4px; padding-right: 4px; }
+  .pf-custom input { min-width: 0; }
 }
 </style>
 </head>
@@ -124,7 +132,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
 
   <section class="pf-card pf-chartcard">
     <div class="pf-bar">
-      <h2 id="chart-title">Return vs benchmark</h2>
+      <h2 id="chart-title">Portfolio performance</h2>
       <div class="pf-seg" id="view" role="group" aria-label="View">
         <button type="button" data-view="perf" aria-pressed="true">Return</button>
         <button type="button" data-view="value" aria-pressed="false">Value</button>
@@ -132,29 +140,39 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     </div>
     <div class="pf-ctrls">
       <div class="pf-seg wide" id="range" role="group" aria-label="Range">
-        <button type="button" data-range="ibkr" aria-pressed="false">Since IBKR</button>
+        <button type="button" data-range="1d" aria-pressed="false">1D</button>
+        <button type="button" data-range="1m" aria-pressed="false">1M</button>
+        <button type="button" data-range="6m" aria-pressed="false">6M</button>
         <button type="button" data-range="ytd" aria-pressed="false">YTD</button>
         <button type="button" data-range="1y" aria-pressed="false">1Y</button>
         <button type="button" data-range="all" aria-pressed="true">All</button>
+        <button type="button" data-range="custom" aria-pressed="false">Custom</button>
       </div>
       <select id="bench" aria-label="Benchmark"></select>
     </div>
+    <div class="pf-custom" id="custom" hidden>
+      <label>From <input type="date" id="from"></label>
+      <label>To <input type="date" id="to"></label>
+      <button class="pf-btn small" type="button" id="zoom-reset">Show all</button>
+    </div>
     <div class="pf-chart" id="chart"></div>
+    <p class="pf-hint" id="hint"></p>
     <div class="pf-legend" id="legend"></div>
+  </section>
+
+  <section class="pf-card">
+    <h2>Holdings</h2>
+    <table class="pf-table">
+      <thead><tr><th>Holding</th><th>CHF</th><th class="pf-col-detail">Weight</th><th>Today</th><th>Profit</th><th>Return</th></tr></thead>
+      <tbody id="holdings"></tbody>
+      <tfoot id="holdings-total"></tfoot>
+    </table>
   </section>
 
   <section class="pf-card">
     <h2>Pension and savings</h2>
     <div id="wealth"></div>
     <div class="pf-total"><span>Net worth (CHF)</span><b id="t-net">—</b></div>
-  </section>
-
-  <section class="pf-card">
-    <h2>Holdings</h2>
-    <table class="pf-table">
-      <thead><tr><th>Holding</th><th>CHF</th><th>Weight</th><th>Today</th></tr></thead>
-      <tbody id="holdings"></tbody>
-    </table>
   </section>
 
   <p class="pf-note" id="foot"></p>
@@ -164,7 +182,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
 
 <script>
 (function () {
-  var state = { data: null, view: 'perf', range: 'all', bench: 'b1', busy: false, loading: false, fetchedAt: 0 };
+  var state = { data: null, view: 'perf', range: 'all', from: '', to: '', bench: 'b1', busy: false, loading: false, fetchedAt: 0 };
   var $ = function (id) { return document.getElementById(id); };
 
   // ---------- data link (the Apps Script web app, protected by a key) ----------
@@ -289,6 +307,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     renderHoldings(d);
     renderChart();
     $('foot').textContent = 'Total return is time-weighted in CHF, chained from IBKR’s daily closing values and today’s live prices. ' +
+      'Holding profit and return use IBKR’s cost basis, converted to CHF at the latest IBKR rate. ' +
       'VIAC values are estimates from stand-in ETFs until you enter the real value. Page built ' + stamp(d.generated) + '.';
   }
 
@@ -329,14 +348,26 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   function renderHoldings(d) {
     var list = d.holdings || [];
     var total = list.reduce(function (s, h) { return s + (h.valueChf || 0); }, 0);
+    var num = function (x) { return isFinite(x) && x !== null; };
+    var cls = function (x) { return num(x) ? (x > 0 ? 'pos' : x < 0 ? 'neg' : '') : ''; };
+    var prev = 0, now = 0, cost = 0, profit = 0, withCost = 0;
     $('holdings').innerHTML = list.map(function (h) {
       var w = total > 0 && h.valueChf !== null ? h.valueChf / total : null;
-      var ch = h.change;
-      var cls = isFinite(ch) && ch !== null ? (ch > 0 ? 'pos' : ch < 0 ? 'neg' : '') : '';
+      var live = h.source === 'Live' && num(h.change);
+      if (live && num(h.valueChf)) { now += h.valueChf; prev += h.valueChf / (1 + h.change); }
+      if (num(h.costChf) && num(h.profitChf)) { cost += h.costChf; profit += h.profitChf; withCost++; }
       return '<tr><td>' + esc(h.symbol) + (h.source !== 'Live' ? '<span class="pf-tag">close</span>' : '') + '</td>' +
-        '<td>' + chf(h.valueChf) + '</td><td>' + (w === null ? '—' : (w * 100).toFixed(1) + '%') + '</td>' +
-        '<td class="' + cls + '">' + (h.source === 'Live' ? pct(ch) : '—') + '</td></tr>';
+        '<td>' + chf(h.valueChf) + '</td><td class="pf-col-detail">' + (w === null ? '—' : (w * 100).toFixed(1) + '%') + '</td>' +
+        '<td class="' + (live ? cls(h.change) : '') + '">' + (live ? pct(h.change) : '—') + '</td>' +
+        '<td class="' + cls(h.profitChf) + '">' + (num(h.profitChf) ? signed(h.profitChf) : '—') + '</td>' +
+        '<td class="' + cls(h.totalReturn) + '">' + (num(h.totalReturn) ? pct(h.totalReturn) : '—') + '</td></tr>';
     }).join('');
+    var dayCh = prev > 0 ? now / prev - 1 : null;
+    var totRet = withCost && cost > 0 ? profit / cost : null;
+    $('holdings-total').innerHTML = list.length ? '<tr><td>Total</td><td>' + chf(total) + '</td><td class="pf-col-detail">100%</td>' +
+      '<td class="' + cls(dayCh) + '">' + (dayCh === null ? '—' : pct(dayCh)) + '</td>' +
+      '<td class="' + (withCost ? cls(profit) : '') + '">' + (withCost ? signed(profit) : '—') + '</td>' +
+      '<td class="' + cls(totRet) + '">' + (totRet === null ? '—' : pct(totRet)) + '</td></tr>' : '';
   }
 
   // ---------- chart ----------
@@ -361,17 +392,35 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     return pts;
   }
 
-  function startIndex(pts) {
-    if (state.range === 'all' || !pts.length) return 0;
-    var last = parseDate(pts[pts.length - 1].date);
-    var i;
-    if (state.range === 'ibkr') {
-      for (i = pts.length - 1; i >= 0; i--) if (pts[i].src === 'DEGIRO') return i;
-      return 0;
+  function isoDay(t) { var d = new Date(t); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+  /** First and last index of the points shown for the chosen range. */
+  function rangeIdx(pts) {
+    var n = pts.length, i;
+    if (n < 2 || state.range === 'all') return [0, n - 1];
+    if (state.range === '1d') return [n - 2, n - 1];
+    var last = parseDate(pts[n - 1].date);
+    if (state.range === 'custom') {
+      var s = 0, e = n - 1;
+      if (state.from) for (i = n - 1; i >= 0; i--) if (pts[i].date <= state.from) { s = i; break; }
+      if (state.to) for (i = 0; i < n; i++) if (pts[i].date >= state.to) { e = i; break; }
+      if (e <= s) { if (s >= n - 1) s = n - 2; e = s + 1; }
+      return [s, e];
     }
-    var cut = state.range === 'ytd' ? new Date(last.getFullYear(), 0, 1) : new Date(last.getFullYear() - 1, last.getMonth(), last.getDate());
-    for (i = pts.length - 1; i >= 0; i--) if (parseDate(pts[i].date) <= cut) return i;
-    return 0;
+    var cut;
+    if (state.range === 'ytd') cut = new Date(last.getFullYear(), 0, 1);
+    else {
+      var months = { '1m': 1, '6m': 6, '1y': 12 }[state.range] || 12;
+      cut = new Date(last.getFullYear(), last.getMonth() - months, last.getDate());
+    }
+    for (i = n - 1; i >= 0; i--) if (parseDate(pts[i].date) <= cut) return [Math.min(i, n - 2), n - 1];
+    return [0, n - 1];
+  }
+
+  /** Date of the first IBKR point after the DEGIRO history: the move to IBKR. */
+  function ibkrStart(pts) {
+    for (var i = 1; i < pts.length; i++) if (pts[i - 1].src === 'DEGIRO' && pts[i].src !== 'DEGIRO') return pts[i].date;
+    return null;
   }
 
   function niceTicks(lo, hi, count) {
@@ -388,8 +437,11 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     var box = $('chart');
     var pts = series();
     if (pts.length < 2) { box.innerHTML = '<p class="pf-note">Not enough history yet.</p>'; $('legend').innerHTML = ''; return; }
-    var s0 = startIndex(pts);
-    var view = pts.slice(s0);
+    var ix = rangeIdx(pts);
+    var view = pts.slice(ix[0], ix[1] + 1);
+    $('custom').hidden = state.range !== 'custom';
+    $('from').value = view[0].date; $('to').value = view[view.length - 1].date;
+    $('from').min = $('to').min = pts[0].date; $('from').max = $('to').max = pts[pts.length - 1].date;
     var base = view[0];
     var perf = state.view === 'perf';
     var bkey = state.bench === 'none' ? null : state.bench;
@@ -404,7 +456,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     } else {
       lines.push({ name: 'Account value', color: 'var(--accent)', vals: view.map(function (p) { return isFinite(p.value) ? p.value : null; }) });
     }
-    $('chart-title').textContent = perf ? 'Return vs benchmark' : 'Account value (CHF)';
+    $('chart-title').textContent = perf ? 'Portfolio performance' : 'Account value (CHF)';
     $('bench').hidden = !perf;
 
     var W = Math.max(280, box.clientWidth || 600), H = W < 520 ? 240 : 300;
@@ -427,7 +479,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       svg += '<text x="' + (m.l - 6) + '" y="' + (+y + 4) + '" text-anchor="end">' + (perf ? (v < 0 ? '−' : '') + Math.abs(Math.round(v * 100)) + '%' : (Math.abs(v) >= 1000 ? Math.round(v / 1000) + 'k' : Math.round(v))) + '</text>';
     });
     var spanDays = (t1 - t0) / 86400000;
-    var nx = W < 520 ? 3 : 6;
+    var nx = Math.min(W < 520 ? 3 : 6, view.length - 1);
     for (var k = 0; k <= nx; k++) {
       var tt = t0 + (t1 - t0) * k / nx, dd = new Date(tt);
       var label = spanDays > 150 ? MONTHS[dd.getMonth()] + ' ' + String(dd.getFullYear()).slice(2) : dd.getDate() + ' ' + MONTHS[dd.getMonth()];
@@ -443,6 +495,13 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       });
       svg += '<path d="' + dpath + '" fill="none" stroke="' + L.color + '" stroke-width="2"' + (L.dash ? ' stroke-dasharray="' + L.dash + '"' : '') + ' stroke-linejoin="round"/>';
     });
+    var moved = ibkrStart(pts);
+    if (moved && moved > view[0].date && moved <= view[view.length - 1].date) {
+      var mx = X(moved), right = mx > W - 90;
+      svg += '<line x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) + '" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="1 3"/>';
+      svg += '<text x="' + (mx + (right ? -4 : 4)).toFixed(1) + '" y="' + (m.t + 10) + '" text-anchor="' + (right ? 'end' : 'start') + '">Moved to IBKR</text>';
+    }
+    svg += '<rect id="sel" y="' + m.t + '" height="' + (H - m.t - m.b) + '" fill="var(--accent)" fill-opacity="0.12" visibility="hidden"/>';
     svg += '<line id="cx" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--faint)" stroke-width="1" visibility="hidden"/>';
     lines.forEach(function (L, i) { svg += '<circle id="cd' + i + '" r="3.5" fill="' + L.color + '" visibility="hidden"/>'; });
     svg += '</svg><div class="pf-tip" id="tip" hidden></div>';
@@ -478,9 +537,43 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       $('cx').setAttribute('visibility', 'hidden'); $('tip').hidden = true;
       lines.forEach(function (L, i) { $('cd' + i).setAttribute('visibility', 'hidden'); });
     }
-    svgEl.addEventListener('pointermove', function (e) { show(e.clientX); });
-    svgEl.addEventListener('pointerdown', function (e) { show(e.clientX); });
-    svgEl.addEventListener('pointerleave', hide);
+    // drag across the chart to zoom into that window (on a phone: hold for a moment, then drag)
+    var drag = null;
+    function toPx(clientX) { var r = svgEl.getBoundingClientRect(); return Math.min(W - m.r, Math.max(m.l, (clientX - r.left) * (W / r.width))); }
+    function nearest(px) { var best = 0, bd = Infinity; view.forEach(function (p, i) { var dx = Math.abs(X(p.date) - px); if (dx < bd) { bd = dx; best = i; } }); return best; }
+    function drawSel() {
+      var a = Math.min(drag.x0, drag.x1), b = Math.max(drag.x0, drag.x1), sel = $('sel');
+      sel.setAttribute('x', a); sel.setAttribute('width', Math.max(1, b - a)); sel.setAttribute('visibility', 'visible');
+    }
+    svgEl.addEventListener('pointerdown', function (e) {
+      show(e.clientX);
+      drag = { id: e.pointerId, x0: toPx(e.clientX), x1: toPx(e.clientX), on: e.pointerType === 'mouse', timer: null };
+      if (!drag.on) drag.timer = setTimeout(function () { if (drag) { drag.on = true; drawSel(); if (navigator.vibrate) navigator.vibrate(10); } }, 350);
+      try { svgEl.setPointerCapture(e.pointerId); } catch (err) { /* not supported */ }
+    });
+    svgEl.addEventListener('pointermove', function (e) {
+      show(e.clientX);
+      if (!drag || drag.id !== e.pointerId) return;
+      drag.x1 = toPx(e.clientX);
+      if (!drag.on && Math.abs(drag.x1 - drag.x0) > 10 && drag.timer) { clearTimeout(drag.timer); drag.timer = null; }
+      if (drag.on && Math.abs(drag.x1 - drag.x0) > 4) drawSel();
+    });
+    function endDrag(e) {
+      if (!drag || drag.id !== e.pointerId) return;
+      var d = drag; drag = null;
+      if (d.timer) clearTimeout(d.timer);
+      $('sel').setAttribute('visibility', 'hidden');
+      if (!d.on || Math.abs(d.x1 - d.x0) < 12) return;
+      var i0 = nearest(Math.min(d.x0, d.x1)), i1 = nearest(Math.max(d.x0, d.x1));
+      if (i1 <= i0) return;
+      state.range = 'custom'; state.from = view[i0].date; state.to = view[i1].date;
+      pressGroup('range', 'data-range', 'custom');
+      renderChart();
+    }
+    svgEl.addEventListener('pointerup', endDrag);
+    svgEl.addEventListener('pointercancel', function (e) { if (drag && drag.timer) clearTimeout(drag.timer); drag = null; $('sel').setAttribute('visibility', 'hidden'); });
+    svgEl.addEventListener('pointerleave', function () { if (!drag) hide(); });
+    $('hint').textContent = matchMedia('(pointer: coarse)').matches ? 'Hold a finger on the chart, then drag to zoom in.' : 'Drag across the chart to zoom in.';
   }
 
   // ---------- events ----------
@@ -495,7 +588,20 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   });
   $('range').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
-    state.range = b.getAttribute('data-range'); pressGroup('range', 'data-range', state.range); if (state.data) renderChart();
+    var r = b.getAttribute('data-range');
+    if (r === 'custom' && state.range !== 'custom') { state.from = $('from').value; state.to = $('to').value; }
+    state.range = r; pressGroup('range', 'data-range', state.range); if (state.data) renderChart();
+  });
+  ['from', 'to'].forEach(function (id) {
+    $(id).addEventListener('change', function () {
+      if (!this.value) return;
+      state.from = $('from').value; state.to = $('to').value;
+      if (state.from && state.to && state.from >= state.to) { if (id === 'from') state.to = ''; else state.from = ''; }   // keep the window the right way round
+      state.range = 'custom'; pressGroup('range', 'data-range', 'custom'); if (state.data) renderChart();
+    });
+  });
+  $('zoom-reset').addEventListener('click', function () {
+    state.range = 'all'; pressGroup('range', 'data-range', 'all'); if (state.data) renderChart();
   });
   $('bench').addEventListener('change', function () { state.bench = this.value; if (state.data) renderChart(); });
   window.addEventListener('resize', function () { if (state.data) renderChart(); });
