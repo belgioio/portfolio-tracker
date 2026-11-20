@@ -34,7 +34,7 @@ html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: va
 .pf-btn:disabled { opacity: 0.6; cursor: default; }
 .pf-btn.small { min-height: 36px; padding: 6px 14px; font-size: 0.85rem; }
 .pf-status { margin: -6px 0 0; color: var(--muted); font-size: 0.8rem; }
-.pf-banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: var(--radius); padding: 10px 12px; font-size: 0.88rem; }
+.pf-banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: var(--radius); padding: 10px 12px; font-size: 0.88rem; overflow-wrap: anywhere; }
 .pf-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .pf-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; min-width: 0; }
 .pf-card h3 { margin: 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -275,7 +275,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     $('status').textContent = bits.join(' · ');
 
     var banner = [];
-    if (d.lastResult && d.lastResult.indexOf('Failed') === 0) banner.push('Last IBKR sync failed: ' + d.lastResult.replace(/^Failed:\s*/, ''));
+    if (d.lastResult && d.lastResult.indexOf('Failed') === 0) banner.push('Last IBKR sync failed: ' + d.lastResult.replace(/^Failed:\s*/, '').replace(/https?:\/\/([^\/\s?#]+)\S*/g, '$1'));   // a web address shrinks to its host name
     if (d.tokenExpiry) {
       var days = Math.round((parseDate(d.tokenExpiry) - new Date()) / 86400000);
       if (days < 0) banner.push('The IBKR Flex token expired on ' + dayMonthYear(d.tokenExpiry) + '. Create a new one and update FLEX_TOKEN.');
