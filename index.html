@@ -81,6 +81,13 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
 .pf-hintrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: -4px; }
 .pf-hintrow .pf-btn { flex: none; }
 .pf-table tfoot td { font-weight: 600; border-bottom: 0; border-top: 2px solid var(--line); }
+.pf-fc { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pf-toggle[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.pf-fcctl { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; color: var(--muted); }
+.pf-fcin { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.pf-fcin input { font: inherit; width: 5.2em; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px; min-height: 34px; text-align: right; }
+.pf-fcsum { margin: 0; font-size: 0.86rem; line-height: 1.5; }
+.pf-sw.band { border-top: 0; height: 10px; border-radius: 2px; background: var(--accent); opacity: 0.3; }
 .pf-note { margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.5; }
 .pf-toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: 92vw; background: var(--fg); color: var(--bg);
   border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
@@ -98,6 +105,8 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   .pf-seg.wide button { flex: 1 1 0; min-height: 40px; padding: 6px 4px; white-space: nowrap; }
   .pf-seg.wide { display: flex; }
   .pf-ctrls select { width: 100%; }
+  .pf-fcctl { width: 100%; }
+  .pf-fcctl select { flex: 1 1 100%; }
   .pf-col-detail { display: none; }
   .pf-table { font-size: 0.78rem; }
   .pf-table th, .pf-table td { padding-left: 3px; padding-right: 3px; }
@@ -154,6 +163,18 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       </div>
       <select id="bench" aria-label="Benchmark"></select>
     </div>
+    <div class="pf-fc">
+      <button class="pf-btn small pf-toggle" type="button" id="fc-toggle" aria-pressed="false">Forecast</button>
+      <div class="pf-fcctl" id="fc-ctl" hidden>
+        <select id="fc-scn" aria-label="Forecast scenario"></select>
+        <select id="fc-hz" aria-label="Forecast horizon">
+          <option value="1">1 year ahead</option><option value="5">5 years ahead</option><option value="10">10 years ahead</option>
+          <option value="20">20 years ahead</option><option value="30">30 years ahead</option>
+        </select>
+        <label class="pf-fcin" id="fc-rate-l" hidden>Return <input id="fc-rate" type="text" inputmode="decimal" aria-label="Custom yearly return in percent"> % a year</label>
+        <label class="pf-fcin" id="fc-save-l">Saving <input id="fc-save" type="text" inputmode="decimal" aria-label="Monthly saving in CHF"> CHF a month</label>
+      </div>
+    </div>
     <div class="pf-custom" id="custom" hidden>
       <label>From <input type="date" id="from"></label>
       <label>To <input type="date" id="to"></label>
@@ -162,6 +183,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     <div class="pf-chart" id="chart"></div>
     <div class="pf-hintrow"><p class="pf-hint" id="hint"></p><button class="pf-btn small" type="button" id="unzoom" hidden>Reset zoom</button></div>
     <div class="pf-legend" id="legend"></div>
+    <p class="pf-fcsum" id="fc-sum" hidden></p>
   </section>
 
   <section class="pf-card" aria-label="Holdings">
@@ -323,6 +345,8 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     $('foot').textContent = 'Total return is time-weighted in CHF, chained from IBKR’s daily closing values and today’s live prices. ' +
       'Holding profit and return use IBKR’s cost basis, converted to CHF at the latest IBKR rate. ' +
       '1D draws a snapshot taken every 15 minutes on weekdays, 09:00 to 22:15. ' +
+      'Forecasts compound the chosen yearly return; the shaded ranges come from your portfolio’s measured ups and downs (2,000 simulated paths when saving). ' +
+      'They treat the whole account as invested, cash included, and leave out taxes and fees. A forecast is not a promise. ' +
       'VIAC values are estimates from stand-in ETFs until you enter the real value. Page built ' + stamp(d.generated) + '.';
   }
 
@@ -407,6 +431,123 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     return pts;
   }
 
+  // ---------- forecast ----------
+  var FC = 'pt_fc';
+  var SCENARIOS = [
+    { id: 'base', label: 'Plan base, 5.5% a year', rate: 0.055 },
+    { id: 'low', label: 'Plan conservative, 3.5% a year', rate: 0.035 },
+    { id: 'high', label: 'Plan optimistic, 7.5% a year', rate: 0.075 },
+    { id: 'trend', label: 'Your trend so far', rate: null },
+    { id: 'custom', label: 'Custom', rate: null }
+  ];
+  state.fc = (function () {
+    var d = { on: false, scn: 'base', hz: 10, rate: 6, save: 1000 };
+    try { var v = JSON.parse(localStorage.getItem(FC) || 'null'); if (v) for (var k in d) if (k in v) d[k] = v[k]; } catch (e) { /* storage unavailable */ }
+    return d;
+  })();
+  function saveFc() { try { localStorage.setItem(FC, JSON.stringify(state.fc)); } catch (e) { /* storage unavailable */ } }
+  function trendRate() { var t = (state.data && state.data.tiles) || {}; return isFinite(t.perYear) && t.perYear !== null ? t.perYear : null; }
+  function fcRate() {
+    var id = state.fc.scn;
+    if (id === 'trend') return trendRate();
+    if (id === 'custom') return isFinite(+state.fc.rate) ? +state.fc.rate / 100 : null;
+    for (var i = 0; i < SCENARIOS.length; i++) if (SCENARIOS[i].id === id) return SCENARIOS[i].rate;
+    return 0.055;
+  }
+
+  /** Yearly volatility of the TWR index, from about weekly steps over the whole history. */
+  function volatility(pts) {
+    var kept = [], i;
+    for (i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      if (p.live || !isFinite(p.twr) || p.twr === null || p.twr <= 0) continue;
+      if (!kept.length || parseDate(p.date) - parseDate(kept[kept.length - 1].date) >= 6 * 86400000) kept.push(p);
+    }
+    var steps = [], sr = 0, st = 0;
+    for (i = 1; i < kept.length; i++) {
+      var dt = (parseDate(kept[i].date) - parseDate(kept[i - 1].date)) / (365.25 * 86400000), r = Math.log(kept[i].twr / kept[i - 1].twr);
+      steps.push([r, dt]); sr += r; st += dt;
+    }
+    if (steps.length < 8 || st <= 0) return 0.15;   // too little history: the plan's 15%
+    var mu = sr / st, v = 0;
+    steps.forEach(function (x) { v += Math.pow(x[0] - mu * x[1], 2); });
+    return Math.min(0.4, Math.max(0.08, Math.sqrt(v / st)));
+  }
+
+  function addMonthsIso(iso, k) {
+    var d = parseDate(iso), t = new Date(d.getFullYear(), d.getMonth() + k, 1);
+    t.setDate(Math.min(d.getDate(), new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()));
+    return isoDay(t.getTime());
+  }
+  function mulberry32(a) {
+    return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function gauss(rnd) { var u = 0; while (u === 0) u = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd()); }
+  function quantile(sorted, p) { var x = p * (sorted.length - 1), i = Math.floor(x), j = Math.min(i + 1, sorted.length - 1); return sorted[i] + (sorted[j] - sorted[i]) * (x - i); }
+
+  /**
+   * Median path (the yearly return compounded monthly, plus the saving at each month end) and the
+   * ranges that hold 50% and 80% of outcomes. Without savings the ranges are exact (lognormal);
+   * with savings they come from 2,000 simulated monthly paths, seeded so the chart doesn't jitter.
+   */
+  var fcCache = { key: '', val: null };
+  function forecastPath(startIso, v0, years, rate, sigma, saving) {
+    var key = [startIso, v0, years, rate, sigma, saving].join('|');
+    if (fcCache.key === key) return JSON.parse(fcCache.val);
+    var res = computeForecast(startIso, v0, years, rate, sigma, saving);
+    fcCache = { key: key, val: JSON.stringify(res) };
+    return res;
+  }
+  function computeForecast(startIso, v0, years, rate, sigma, saving) {
+    var months = Math.round(years * 12), every = months <= 24 ? 1 : months <= 120 ? 3 : 6, marks = [], k, i;
+    for (k = every; k < months; k += every) marks.push(k);
+    marks.push(months);
+    var out = { dates: [], med: [], p10: [], p25: [], p75: [], p90: [] };
+    var g = Math.pow(1 + rate, 1 / 12), med = [], v = v0;
+    for (k = 1; k <= months; k++) { v = v * g + saving; med[k] = v; }
+    if (!saving) {
+      marks.forEach(function (k) {
+        var t = k / 12, w = sigma * Math.sqrt(t), c = v0 * Math.pow(1 + rate, t);
+        out.dates.push(addMonthsIso(startIso, k)); out.med.push(c);
+        out.p10.push(c * Math.exp(-1.2816 * w)); out.p25.push(c * Math.exp(-0.6745 * w));
+        out.p75.push(c * Math.exp(0.6745 * w)); out.p90.push(c * Math.exp(1.2816 * w));
+      });
+      return out;
+    }
+    var N = 2000, rnd = mulberry32(20261120), paths = new Float64Array(N), buf = new Float64Array(N), at = {};
+    var drift = Math.log(1 + rate) / 12, sm = sigma / Math.sqrt(12);
+    for (i = 0; i < N; i++) paths[i] = v0;
+    marks.forEach(function (k) { at[k] = true; });
+    for (k = 1; k <= months; k++) {
+      for (i = 0; i < N; i++) paths[i] = paths[i] * Math.exp(drift + sm * gauss(rnd)) + saving;
+      if (!at[k]) continue;
+      buf.set(paths); buf.sort();
+      out.dates.push(addMonthsIso(startIso, k)); out.med.push(med[k]);
+      out.p10.push(quantile(buf, 0.10)); out.p25.push(quantile(buf, 0.25)); out.p75.push(quantile(buf, 0.75)); out.p90.push(quantile(buf, 0.90));
+    }
+    return out;
+  }
+
+  function renderFcControls() {
+    var on = state.fc.on, trend = trendRate();
+    $('fc-toggle').setAttribute('aria-pressed', String(on));
+    $('fc-ctl').hidden = !on;
+    if (state.fc.scn === 'trend' && trend === null) state.fc.scn = 'base';
+    var opts = SCENARIOS.map(function (x) {
+      var label = x.id !== 'trend' ? x.label : trend === null ? 'Your trend so far (not enough data)'
+        : 'Your trend so far, ' + (trend * 100).toFixed(1) + '% a year (short history)';
+      return '<option value="' + x.id + '"' + (x.id === state.fc.scn ? ' selected' : '') + (x.id === 'trend' && trend === null ? ' disabled' : '') + '>' + esc(label) + '</option>';
+    }).join('');
+    if ($('fc-scn').innerHTML !== opts) $('fc-scn').innerHTML = opts;
+    $('fc-scn').value = state.fc.scn;
+    $('fc-hz').value = String(state.fc.hz);
+    $('fc-rate-l').hidden = state.fc.scn !== 'custom';
+    $('fc-save-l').hidden = state.view === 'perf';
+    if (document.activeElement !== $('fc-rate')) $('fc-rate').value = String(state.fc.rate);
+    if (document.activeElement !== $('fc-save')) $('fc-save').value = chf(state.fc.save);
+  }
+  function monthYear(iso) { var d = parseDate(iso); return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+
   /** 1D: the last day of 15-minute snapshots, from the previous close; null when there are none yet. */
   function intradaySeries() {
     var d = state.data, I = d.intraday, h = d.history || {};
@@ -484,10 +625,13 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
 
   function renderChart() {
     var box = $('chart');
-    var intra = state.range === '1d' ? intradaySeries() : null;
+    renderFcControls();
+    var fcOn = state.fc.on;
+    var intra = state.range === '1d' && !fcOn ? intradaySeries() : null;
     var pts = intra || series();
     if (pts.length < 2) { box.innerHTML = '<p class="pf-note">Not enough history yet.</p>'; $('legend').innerHTML = ''; return; }
     var ix = intra ? intradayIdx(pts) : rangeIdx(pts);
+    if (fcOn) ix[1] = pts.length - 1;   // a forecast always starts from the latest point
     var view = pts.slice(ix[0], ix[1] + 1);
     $('custom').hidden = state.range !== 'custom';
     if (!intra) {
@@ -512,10 +656,24 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     $('chart-title').textContent = perf ? 'Portfolio performance' : 'Account value (CHF)';
     $('bench').hidden = !perf;
 
+    var fc = null, rate = fcOn ? fcRate() : null;
+    var v0 = lines[0].vals[lines[0].vals.length - 1];
+    if (fcOn && rate !== null && isFinite(rate) && v0 !== null && isFinite(v0)) {
+      var sigma = volatility(pts), years = +state.fc.hz || 10, startIso = view[view.length - 1].date.slice(0, 10);
+      if (perf) {   // returns: from the chart's start, so the forecast continues the line
+        fc = forecastPath(startIso, 1 + v0, years, rate, sigma, 0);
+        ['med', 'p10', 'p25', 'p75', 'p90'].forEach(function (k) { fc[k] = fc[k].map(function (x) { return x - 1; }); });
+      } else {
+        fc = forecastPath(startIso, v0, years, rate, sigma, Math.max(0, +state.fc.save || 0));
+      }
+      fc.start = startIso; fc.v0 = v0; fc.rate = rate; fc.sigma = sigma; fc.years = years;
+    }
+
     var W = Math.max(280, box.clientWidth || 600), H = W < 520 ? 240 : 300;
     var m = { l: perf ? 44 : 52, r: 10, t: 10, b: 24 };
     var all = [];
     lines.forEach(function (L) { L.vals.forEach(function (v) { if (v !== null) all.push(v); }); });
+    if (fc) all = all.concat(fc.p10, fc.p90, fc.med);
     var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
     if (perf) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
     var pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
@@ -523,10 +681,13 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     var step = ticks.length > 1 ? ticks[1] - ticks[0] : 1;
     var yLabel = function (v) {   // enough decimals that neighbouring ticks never read the same
       if (perf) { var dec = step >= 0.01 ? 0 : step >= 0.001 ? 1 : 2; return (v < -1e-12 ? '−' : '') + Math.abs(v * 100).toFixed(dec) + '%'; }
-      return step >= 1000 ? Math.round(v / 1000) + 'k' : chf(v);
+      if (Math.abs(v) < 1e-9) return '0';
+      if (step < 1000) return chf(v);
+      if (Math.max(Math.abs(ticks[0]), Math.abs(ticks[ticks.length - 1])) >= 1e6) return +(v / 1e6).toFixed(step >= 1e6 ? 0 : 1) + 'M';
+      return Math.round(v / 1000) + 'k';
     };
     lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
-    var t0 = parseDate(view[0].date).getTime(), t1 = parseDate(view[view.length - 1].date).getTime();
+    var t0 = parseDate(view[0].date).getTime(), t1 = parseDate(fc ? fc.dates[fc.dates.length - 1] : view[view.length - 1].date).getTime();
     var X = function (s) { return m.l + (W - m.l - m.r) * ((parseDate(s).getTime() - t0) / Math.max(1, t1 - t0)); };
     var Y = function (v) { return m.t + (H - m.t - m.b) * (1 - (v - lo) / (hi - lo)); };
 
@@ -550,10 +711,21 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     var nx = spanDays < 1.5 ? -1 : Math.min(W < 520 ? 3 : 6, view.length - 1);
     for (var k = 0; k <= nx; k++) {
       var tt = t0 + (t1 - t0) * k / nx, dd = new Date(tt);
-      var label = spanDays > 150 ? MONTHS[dd.getMonth()] + ' ' + String(dd.getFullYear()).slice(2)
+      var label = spanDays > 1800 ? String(dd.getFullYear()) : spanDays > 150 ? MONTHS[dd.getMonth()] + ' ' + String(dd.getFullYear()).slice(2)
         : dd.getDate() + ' ' + MONTHS[dd.getMonth()];
       var x = m.l + (W - m.l - m.r) * k / nx;
       svg += '<text x="' + x.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + (k === 0 ? 'start' : k === nx ? 'end' : 'middle') + '">' + label + '</text>';
+    }
+    if (fc) {   // shaded ranges first, so the lines sit on top
+      var xs = [X(fc.start)].concat(fc.dates.map(X));
+      var area = function (low, high) {
+        var d = 'M' + xs[0].toFixed(1) + ' ' + Y(fc.v0).toFixed(1), i;
+        for (i = 0; i < high.length; i++) d += 'L' + xs[i + 1].toFixed(1) + ' ' + Y(high[i]).toFixed(1);
+        for (i = low.length - 1; i >= 0; i--) d += 'L' + xs[i + 1].toFixed(1) + ' ' + Y(low[i]).toFixed(1);
+        return d + 'Z';
+      };
+      svg += '<path d="' + area(fc.p10, fc.p90) + '" fill="var(--accent)" fill-opacity="0.10" stroke="none"/>';
+      svg += '<path d="' + area(fc.p25, fc.p75) + '" fill="var(--accent)" fill-opacity="0.20" stroke="none"/>';
     }
     lines.forEach(function (L) {
       var dpath = '', pen = false;
@@ -564,8 +736,17 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       });
       svg += '<path d="' + dpath + '" fill="none" stroke="' + L.color + '" stroke-width="2"' + (L.dash ? ' stroke-dasharray="' + L.dash + '"' : '') + ' stroke-linejoin="round"/>';
     });
+    var todayX = null;
+    if (fc) {
+      var mp = 'M' + xs[0].toFixed(1) + ' ' + Y(fc.v0).toFixed(1);
+      fc.med.forEach(function (v, i) { mp += 'L' + xs[i + 1].toFixed(1) + ' ' + Y(v).toFixed(1); });
+      svg += '<path d="' + mp + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/>';
+      todayX = xs[0];
+      svg += '<line x1="' + todayX.toFixed(1) + '" x2="' + todayX.toFixed(1) + '" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="1 3"/>';
+      svg += '<text x="' + (todayX + 4).toFixed(1) + '" y="' + (H - m.b - 6) + '" text-anchor="start">Today</text>';
+    }
     var moved = ibkrStart(pts);
-    if (moved && moved > view[0].date && moved <= view[view.length - 1].date) {
+    if (moved && moved > view[0].date && moved <= view[view.length - 1].date && !(todayX !== null && Math.abs(X(moved) - todayX) < 16)) {
       var mx = X(moved), right = mx > W - 90;
       svg += '<line x1="' + mx.toFixed(1) + '" x2="' + mx.toFixed(1) + '" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--muted)" stroke-width="1" stroke-dasharray="1 3"/>';
       svg += '<text x="' + (mx + (right ? -4 : 4)).toFixed(1) + '" y="' + (m.t + 10) + '" text-anchor="' + (right ? 'end' : 'start') + '">Moved to IBKR</text>';
@@ -573,6 +754,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     svg += '<rect id="sel" y="' + m.t + '" height="' + (H - m.t - m.b) + '" fill="var(--accent)" fill-opacity="0.12" visibility="hidden"/>';
     svg += '<line id="cx" y1="' + m.t + '" y2="' + (H - m.b) + '" stroke="var(--faint)" stroke-width="1" visibility="hidden"/>';
     lines.forEach(function (L, i) { svg += '<circle id="cd' + i + '" r="3.5" fill="' + L.color + '" visibility="hidden"/>'; });
+    svg += '<circle id="cdf" r="3.5" fill="var(--accent)" visibility="hidden"/>';
     svg += '</svg><div class="pf-tip" id="tip" hidden></div>';
     box.innerHTML = svg;
 
@@ -580,17 +762,50 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       var last = null;
       for (var i = L.vals.length - 1; i >= 0; i--) if (L.vals[i] !== null) { last = L.vals[i]; break; }
       return '<span><i class="pf-sw" style="border-color:' + L.color + (L.dash ? ';border-top-style:dashed' : '') + '"></i>' + esc(L.name) + ' ' + (perf ? pct(last) : chf(last)) + '</span>';
-    }).join('');
+    }).join('') + (fc ? '<span><i class="pf-sw" style="border-color:var(--accent);border-top-style:dashed"></i>Forecast at ' + (fc.rate * 100).toFixed(1) + '% a year</span>' +
+      '<span><i class="pf-sw band"></i>Where 50% and 80% of outcomes land</span>' : '');
+    var sum = $('fc-sum');
+    if (fc) {
+      var n = fc.dates.length - 1, when = monthYear(fc.dates[n]) + ' (' + fc.years + (fc.years === 1 ? ' year' : ' years') + ')';
+      if (perf) {
+        var fromNow = function (x) { return (1 + x) / (1 + fc.v0) - 1; };
+        sum.textContent = 'By ' + when + ': ' + pct(fromNow(fc.med[n])) + ' from today at ' + (fc.rate * 100).toFixed(1) + '% a year. ' +
+          'Half of the outcomes land between ' + pct(fromNow(fc.p25[n])) + ' and ' + pct(fromNow(fc.p75[n])) + ', and 80% between ' +
+          pct(fromNow(fc.p10[n])) + ' and ' + pct(fromNow(fc.p90[n])) + '.';
+      } else {
+        var saved = Math.max(0, +state.fc.save || 0) * Math.round(fc.years * 12);
+        sum.textContent = 'By ' + when + ': about CHF ' + chf(fc.med[n]) + ' at ' + (fc.rate * 100).toFixed(1) + '% a year. ' +
+          'Half of the outcomes land between ' + chf(fc.p25[n]) + ' and ' + chf(fc.p75[n]) + ', and 80% between ' + chf(fc.p10[n]) + ' and ' + chf(fc.p90[n]) + '. ' +
+          'Money in: ' + chf(fc.v0) + ' today' + (saved ? ' plus ' + chf(saved) + ' saved' : '') + '.';
+      }
+    }
+    sum.hidden = !fc;
 
     var svgEl = box.querySelector('svg');
     function show(clientX) {
       var r = svgEl.getBoundingClientRect();
       var px = (clientX - r.left) * (W / r.width);
-      var best = 0, bd = Infinity;
+      var best = 0, bd = Infinity, fb = -1;
       view.forEach(function (p, i) { var dx = Math.abs(X(p.date) - px); if (dx < bd) { bd = dx; best = i; } });
-      var x = X(view[best].date);
+      if (fc) fc.dates.forEach(function (dte, i) { var dx = Math.abs(X(dte) - px); if (dx < bd) { bd = dx; fb = i; } });
+      var x = fb >= 0 ? X(fc.dates[fb]) : X(view[best].date);
       var cx = $('cx'); cx.setAttribute('x1', x); cx.setAttribute('x2', x); cx.setAttribute('visibility', 'visible');
-      var html = '<div class="k">' + pointLabel(view[best]) + (view[best].live ? ' (live)' : '') + '</div>';
+      var cf = $('cdf');
+      if (cf) cf.setAttribute('visibility', 'hidden');
+      var html;
+      if (fb >= 0) {
+        var f = perf ? function (x) { return pct((1 + x) / (1 + fc.v0) - 1); } : chf;   // returns: counted from today
+        lines.forEach(function (L, i) { $('cd' + i).setAttribute('visibility', 'hidden'); });
+        cf.setAttribute('cx', x); cf.setAttribute('cy', Y(fc.med[fb])); cf.setAttribute('visibility', 'visible');
+        html = '<div class="k">' + monthYear(fc.dates[fb]) + ', forecast' + (perf ? ', from today' : '') + '</div><div>At ' + (fc.rate * 100).toFixed(1) + '% a year: <b>' + f(fc.med[fb]) + '</b></div>' +
+          '<div class="k">Half between ' + f(fc.p25[fb]) + ' and ' + f(fc.p75[fb]) + '</div><div class="k">80% between ' + f(fc.p10[fb]) + ' and ' + f(fc.p90[fb]) + '</div>';
+        var tipF = $('tip'); tipF.innerHTML = html; tipF.hidden = false;
+        var leftF = x * (r.width / W) + 10;
+        if (leftF + tipF.offsetWidth > r.width) leftF = x * (r.width / W) - tipF.offsetWidth - 10;
+        tipF.style.left = Math.max(0, leftF) + 'px'; tipF.style.top = '6px';
+        return;
+      }
+      html = '<div class="k">' + pointLabel(view[best]) + (view[best].live ? ' (live)' : '') + '</div>';
       lines.forEach(function (L, i) {
         var v = L.vals[best], c = $('cd' + i);
         if (v === null) { c.setAttribute('visibility', 'hidden'); return; }
@@ -603,7 +818,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       tip.style.left = Math.max(0, left) + 'px'; tip.style.top = '6px';
     }
     function hide() {
-      $('cx').setAttribute('visibility', 'hidden'); $('tip').hidden = true;
+      $('cx').setAttribute('visibility', 'hidden'); $('tip').hidden = true; if ($('cdf')) $('cdf').setAttribute('visibility', 'hidden');
       lines.forEach(function (L, i) { $('cd' + i).setAttribute('visibility', 'hidden'); });
     }
     // drag across the chart to zoom into that window (on a phone: hold for a moment, then drag)
@@ -616,6 +831,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     }
     svgEl.addEventListener('pointerdown', function (e) {
       show(e.clientX);
+      if (fc) return;   // the forecast view has no zoom
       drag = { id: e.pointerId, x0: toPx(e.clientX), x1: toPx(e.clientX), on: e.pointerType === 'mouse', timer: null };
       if (!drag.on) drag.timer = setTimeout(function () { if (drag) { drag.on = true; drawSel(); if (navigator.vibrate) navigator.vibrate(10); } }, 350);
       try { svgEl.setPointerCapture(e.pointerId); } catch (err) { /* not supported */ }
@@ -643,7 +859,9 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     svgEl.addEventListener('pointercancel', function (e) { if (drag && drag.timer) clearTimeout(drag.timer); drag = null; $('sel').setAttribute('visibility', 'hidden'); });
     svgEl.addEventListener('pointerleave', function () { if (!drag) hide(); });
     var how = matchMedia('(pointer: coarse)').matches ? 'Hold a finger on the chart, then drag to zoom in.' : 'Drag across the chart to zoom in.';
-    $('hint').textContent = (intra ? 'A point every 15 minutes, prices up to 20 minutes late. ' : state.range === '1d' ? 'Points every 15 minutes start with the first snapshot. ' : '') + how;
+    $('hint').textContent = fc
+      ? 'Dashed: ' + (fc.rate * 100).toFixed(1) + '% a year compounded' + (!perf && state.fc.save ? ', plus the monthly saving' : '') + '. Shaded: where 50% and 80% of outcomes land, given your portfolio’s ups and downs so far (about ' + Math.round(fc.sigma * 100) + '% a year).'
+      : (intra ? 'A point every 15 minutes, prices up to 20 minutes late. ' : state.range === '1d' ? 'Points every 15 minutes start with the first snapshot. ' : '') + how;
   }
 
   // ---------- events ----------
@@ -669,6 +887,18 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       state.from = $('from').value; state.to = $('to').value;
       if (state.from && state.to && state.from >= state.to) { if (id === 'from') state.to = ''; else state.from = ''; }   // keep the window the right way round
       state.range = 'custom'; pressGroup('range', 'data-range', 'custom'); if (state.data) renderChart();
+    });
+  });
+  $('fc-toggle').addEventListener('click', function () { state.fc.on = !state.fc.on; state.iz = null; saveFc(); if (state.data) renderChart(); });
+  $('fc-scn').addEventListener('change', function () { state.fc.scn = this.value; saveFc(); if (state.data) renderChart(); });
+  $('fc-hz').addEventListener('change', function () { state.fc.hz = +this.value; saveFc(); if (state.data) renderChart(); });
+  ['fc-rate', 'fc-save'].forEach(function (id) {
+    $(id).addEventListener('change', function () {
+      var key = id === 'fc-rate' ? 'rate' : 'save';
+      var v = parseFloat(String(this.value).replace(/[’'\s]/g, '').replace(',', '.'));
+      if (!isFinite(v)) { this.value = key === 'rate' ? String(state.fc.rate) : chf(state.fc.save); toast(key === 'rate' ? 'Enter a yearly return in percent, like 6.' : 'Enter a monthly amount in CHF, like 1000.', true); return; }
+      state.fc[key] = key === 'rate' ? Math.max(-20, Math.min(30, v)) : Math.max(0, Math.min(100000, Math.round(v)));
+      saveFc(); if (state.data) renderChart();
     });
   });
   $('unzoom').addEventListener('click', function () { state.iz = null; if (state.data) renderChart(); });
