@@ -178,11 +178,14 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   function link() { try { return JSON.parse(localStorage.getItem(LINK) || 'null'); } catch (e) { return null; } }
   function keepLink(l) { try { localStorage.setItem(LINK, JSON.stringify(l)); } catch (e) { /* storage unavailable */ } }
   function forgetLink() { try { localStorage.removeItem(LINK); } catch (e) { /* storage unavailable */ } }
-  if (location.hash) {
+  function takeLinkFromUrl() {
+    if (!location.hash) return false;
     var fromUrl = readLink(location.href);
     if (fromUrl) keepLink(fromUrl);
     history.replaceState(null, '', location.pathname + location.search);   // keep the key out of the address
+    return !!fromUrl;
   }
+  takeLinkFromUrl();
   function api(params) {
     var l = link();
     if (!l) return Promise.reject(new Error('This phone is not connected yet.'));
@@ -197,6 +200,8 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
       .then(function (j) {
         if (j && j.ok) return j;
         if (j && j.error === 'unauthorized') {
+          var now = link();
+          if (now && now.k !== l.k) throw new Error('Connecting with the new link…');   // a newer link arrived meanwhile
           forgetLink();
           showConnect();
           throw new Error('This phone is no longer connected. Open the Phone app link from the sheet again.');
@@ -530,7 +535,7 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
   function load() {
     if (!link()) { showConnect(); return; }
     showMain();
-    if (state.loading) return;
+    if (state.loading) { state.again = true; return; }
     state.loading = true;
     api({ a: 'data' })
       .then(function (j) { state.fetchedAt = Date.now(); save(j.data); render(j.data); })
@@ -538,7 +543,10 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
         toast(err.message, true);
         if (!state.data && link()) $('status').textContent = 'Could not load the data.';
       })
-      .then(function () { state.loading = false; });
+      .then(function () {
+        state.loading = false;
+        if (state.again) { state.again = false; load(); }
+      });
   }
 
   $('connect-go').addEventListener('click', function () {
@@ -548,6 +556,9 @@ select { font: inherit; font-size: 0.85rem; color: var(--fg); background: var(--
     $('connect-input').value = '';
     load();
   });
+
+  // a link opened while the app is already showing changes only the part after '#', which doesn't reload the page
+  window.addEventListener('hashchange', function () { if (takeLinkFromUrl()) load(); });
 
   // fresh prices when the app comes back to the front
   document.addEventListener('visibilitychange', function () {
